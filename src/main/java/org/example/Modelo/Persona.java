@@ -30,4 +30,15 @@ public class Persona {
     public LocalDate getFechaNacimiento() {
         return fechaNacimiento;
     }
+
+    // Opcional: para facilitar debugging
+    @Override
+    public String toString() {
+        return "Persona{" +
+                "id=" + id +
+                ", nombre='" + nombre + '\'' +
+                ", apellido='" + apellido + '\'' +
+                ", fechaNacimiento=" + fechaNacimiento +
+                '}';
+    }
 }
