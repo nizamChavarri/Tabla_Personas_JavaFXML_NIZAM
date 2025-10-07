@@ -7,7 +7,10 @@ import javafx.scene.control.*;
 import javafx.beans.property.SimpleIntegerProperty;
 import javafx.beans.property.SimpleStringProperty;
 import org.example.Modelo.Persona;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import java.sql.*;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 
@@ -30,20 +33,19 @@ public class Controller {
     private ObservableList<Persona> personas;
     private ObservableList<Persona> backupPersonas;
 
-    private int nextId = 6;
+    private int nextId = 1;
+
+    // Logger SLF4J
+    private static final Logger logger = LoggerFactory.getLogger(Controller.class);
+
+    // Configuración conexión (cambia tus datos)
+    private final String URL = "jdbc:mariadb://localhost:3306/Personas_mariadb";
+    private final String USER = "root";
+    private final String PASSWORD = "admin";
 
     @FXML
     private void initialize() {
-        personas = FXCollections.observableArrayList(
-                new Persona(1, "Ashwin", "Sharan", LocalDate.parse("2012-10-11")),
-                new Persona(2, "Advik", "Sharan", LocalDate.parse("2012-10-11")),
-                new Persona(3, "Layne", "Estes", LocalDate.parse("2011-12-16")),
-                new Persona(4, "Mason", "Boyd", LocalDate.parse("2003-04-20")),
-                new Persona(5, "Babalu", "Sharan", LocalDate.parse("1980-01-10"))
-        );
-
-        backupPersonas = FXCollections.observableArrayList(personas);
-
+        // Configuración columnas TableView
         colId.setCellValueFactory(cell -> new SimpleIntegerProperty(cell.getValue().getId()).asObject());
         colNombre.setCellValueFactory(cell -> new SimpleStringProperty(cell.getValue().getNombre()));
         colApellido.setCellValueFactory(cell -> new SimpleStringProperty(cell.getValue().getApellido()));
@@ -52,11 +54,49 @@ public class Controller {
         ));
 
         tableView.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
+
+        // Carga datos desde la DB
+        personas = cargarDatosDesdeDB();
+        backupPersonas = FXCollections.observableArrayList(personas);
+
         tableView.setItems(personas);
 
+        // Eventos botones
         btnAdd.setOnAction(e -> agregarPersona());
         btnDelete.setOnAction(e -> eliminarSeleccionados());
         btnRestore.setOnAction(e -> restaurarFilas());
+    }
+
+    private ObservableList<Persona> cargarDatosDesdeDB() {
+        ObservableList<Persona> lista = FXCollections.observableArrayList();
+        String sql = "SELECT id, nombre, apellido, fecha_nacimiento FROM personas";
+
+        try (Connection conn = DriverManager.getConnection(URL, USER, PASSWORD);
+             Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
+
+            while (rs.next()) {
+                int id = rs.getInt("id");
+                String nombre = rs.getString("nombre");
+                String apellido = rs.getString("apellido");
+                Date fecha = rs.getDate("fecha_nacimiento");
+                LocalDate fechaNacimiento = fecha != null ? fecha.toLocalDate() : null;
+
+                Persona p = new Persona(id, nombre, apellido, fechaNacimiento);
+                lista.add(p);
+            }
+
+            logger.info("Datos cargados correctamente desde la base de datos. Total registros: {}", lista.size());
+
+        } catch (SQLException e) {
+            logger.error("Error cargando datos desde la base de datos", e);
+            mostrarAlerta("Error", "No se pudo cargar datos desde la base de datos:\n" + e.getMessage());
+        }
+
+        // Ajusta nextId para nuevos registros
+        nextId = lista.stream().mapToInt(Persona::getId).max().orElse(0) + 1;
+
+        return lista;
     }
 
     private void agregarPersona() {
@@ -64,30 +104,80 @@ public class Controller {
         String apellido = txtApellido.getText().trim();
         LocalDate fecha = datePickerFechaNacimiento.getValue();
 
-        if(nombre.isEmpty() || apellido.isEmpty() || fecha == null) {
+        if (nombre.isEmpty() || apellido.isEmpty() || fecha == null) {
             mostrarAlerta("Error", "Debe llenar todos los campos");
+            logger.warn("Intento de agregar persona con campos incompletos");
             return;
         }
 
-        Persona nueva = new Persona(nextId++, nombre, apellido, fecha);
-        personas.add(nueva);
-        backupPersonas.add(nueva);
-        limpiarCampos();
+        String sqlInsert = "INSERT INTO personas (nombre, apellido, fecha_nacimiento) VALUES (?, ?, ?)";
+
+        try (Connection conn = DriverManager.getConnection(URL, USER, PASSWORD);
+             PreparedStatement pstmt = conn.prepareStatement(sqlInsert, Statement.RETURN_GENERATED_KEYS)) {
+
+            pstmt.setString(1, nombre);
+            pstmt.setString(2, apellido);
+            pstmt.setDate(3, Date.valueOf(fecha));
+            int affectedRows = pstmt.executeUpdate();
+
+            if (affectedRows == 0) {
+                mostrarAlerta("Error", "No se pudo insertar la persona en la base de datos");
+                logger.error("No se insertó la persona: {} {}", nombre, apellido);
+                return;
+            }
+
+            try (ResultSet generatedKeys = pstmt.getGeneratedKeys()) {
+                if (generatedKeys.next()) {
+                    int id = generatedKeys.getInt(1);
+                    Persona nueva = new Persona(id, nombre, apellido, fecha);
+                    personas.add(nueva);
+                    backupPersonas.add(nueva);
+                    limpiarCampos();
+                    logger.info("Persona agregada: {} {} (ID: {})", nombre, apellido, id);
+                } else {
+                    mostrarAlerta("Error", "No se pudo obtener el ID generado");
+                    logger.error("No se pudo obtener el ID generado para la persona: {} {}", nombre, apellido);
+                }
+            }
+
+        } catch (SQLException e) {
+            mostrarAlerta("Error", "Error al insertar en la base de datos:\n" + e.getMessage());
+            logger.error("Error al insertar persona en la base de datos", e);
+        }
     }
 
     private void eliminarSeleccionados() {
         ObservableList<Persona> seleccionados = tableView.getSelectionModel().getSelectedItems();
-        if(seleccionados.isEmpty()) {
+        if (seleccionados.isEmpty()) {
             mostrarAlerta("Atención", "No hay filas seleccionadas para eliminar");
+            logger.warn("Intento de eliminar sin seleccionar filas");
             return;
         }
-        personas.removeAll(seleccionados);
+
+        String sqlDelete = "DELETE FROM personas WHERE id = ?";
+
+        try (Connection conn = DriverManager.getConnection(URL, USER, PASSWORD);
+             PreparedStatement pstmt = conn.prepareStatement(sqlDelete)) {
+
+            for (Persona p : seleccionados) {
+                pstmt.setInt(1, p.getId());
+                pstmt.executeUpdate();
+                personas.remove(p);
+                backupPersonas.remove(p);
+                logger.info("Persona eliminada: {} {} (ID: {})", p.getNombre(), p.getApellido(), p.getId());
+            }
+
+        } catch (SQLException e) {
+            mostrarAlerta("Error", "Error al eliminar en la base de datos:\n" + e.getMessage());
+            logger.error("Error al eliminar personas en la base de datos", e);
+        }
     }
 
     private void restaurarFilas() {
-        if(backupPersonas != null) {
+        if (backupPersonas != null) {
             personas.setAll(backupPersonas);
             nextId = backupPersonas.stream().mapToInt(Persona::getId).max().orElse(0) + 1;
+            logger.info("Filas restauradas desde backup. Total: {}", backupPersonas.size());
         }
     }
 
