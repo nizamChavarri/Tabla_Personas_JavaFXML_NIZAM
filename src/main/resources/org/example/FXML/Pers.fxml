@@ -54,8 +54,17 @@
     <!-- Botones -->
     <HBox spacing="10">
         <children>
-            <Button fx:id="btnAdd" text="Agregar"/>
-            <Button fx:id="btnDelete" text="Eliminar"/>
+            <Button fx:id="btnAdd" text="Agregar">
+                <tooltip>
+                    <Tooltip text="Agrega un nuevo registro a la tabla" />
+                </tooltip>
+            </Button>
+
+            <Button fx:id="btnDelete" text="Eliminar">
+                <tooltip>
+                    <Tooltip text="Elimina el registro seleccionado de la tabla" />
+                </tooltip>
+            </Button>
             <Button fx:id="btnRestore" text="Restaurar">
                 <tooltip>
                     <Tooltip text="Restaura todos los registros originales en la tabla" />
