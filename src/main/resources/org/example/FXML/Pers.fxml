@@ -1,55 +1,77 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<?import javafx.scene.control.Button?>
-<?import javafx.scene.control.DatePicker?>
-<?import javafx.scene.control.Label?>
-<?import javafx.scene.control.TableColumn?>
-<?import javafx.scene.control.TableView?>
-<?import javafx.scene.control.TextField?>
-<?import javafx.scene.layout.ColumnConstraints?>
-<?import javafx.scene.layout.GridPane?>
-<?import javafx.scene.layout.HBox?>
-<?import javafx.scene.layout.RowConstraints?>
-<?import javafx.scene.layout.VBox?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.geometry.Insets?>
 
-<VBox maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity"
-      minWidth="-Infinity" prefHeight="400.0" prefWidth="600.0"
+<VBox xmlns="http://javafx.com/javafx/24"
+      xmlns:fx="http://javafx.com/fxml/1"
       fx:controller="org.example.Controlador.Controller"
-      xmlns="http://javafx.com/javafx/24" xmlns:fx="http://javafx.com/fxml/1">
-    <children>
-        <GridPane hgap="10.0" vgap="10.0">
-            <columnConstraints>
-                <ColumnConstraints hgrow="SOMETIMES" minWidth="10.0" prefWidth="100.0" />
-                <ColumnConstraints hgrow="SOMETIMES" minWidth="10.0" prefWidth="100.0" />
-            </columnConstraints>
-            <rowConstraints>
-                <RowConstraints minHeight="10.0" prefHeight="30.0" vgrow="SOMETIMES" />
-                <RowConstraints minHeight="10.0" prefHeight="30.0" vgrow="SOMETIMES" />
-                <RowConstraints minHeight="10.0" prefHeight="30.0" vgrow="SOMETIMES" />
-            </rowConstraints>
-            <children>
-                <Label text="Nombre" />
-                <Label text="Apellido" GridPane.rowIndex="1" />
-                <Label text="Fecha de Nacimiento" GridPane.rowIndex="2" />
-                <TextField fx:id="txtNombre" GridPane.columnIndex="1" promptText="Ingrese nombre" />
-                <TextField fx:id="txtApellido" GridPane.columnIndex="1" GridPane.rowIndex="1" promptText="Ingrese apellido" />
-                <DatePicker fx:id="datePickerFechaNacimiento" GridPane.columnIndex="1" GridPane.rowIndex="2" />
-            </children>
-        </GridPane>
-        <HBox spacing="10" prefHeight="100.0" prefWidth="200.0">
-            <children>
-                <Button mnemonicParsing="false" fx:id="btnAdd" text="Agregar" />
-                <Button mnemonicParsing="false" fx:id="btnDelete" text="Eliminar" />
-                <Button mnemonicParsing="false" fx:id="btnRestore" text="Restaurar" />
-            </children>
-        </HBox>
-        <TableView fx:id="tableView" prefHeight="200.0" prefWidth="200.0">
-            <columns>
-                <TableColumn prefWidth="75.0" fx:id="colId" text="ID" />
-                <TableColumn prefWidth="75.0" fx:id="colNombre" text="Nombre" />
-                <TableColumn prefWidth="75.0" fx:id="colApellido" text="Apellido" />
-                <TableColumn prefWidth="75.0" fx:id="colFechaNacimiento" text="Fecha de Nacimiento" />
-            </columns>
-        </TableView>
-    </children>
+      prefHeight="500.0" prefWidth="650.0"
+      spacing="12">
+
+    <padding>
+        <Insets top="15" right="15" bottom="15" left="15"/>
+    </padding>
+
+    <!-- Menú superior -->
+    <MenuBar>
+        <menus>
+            <Menu text="Archivo">
+                <MenuItem text="Cerrar" onAction="#cerrarVentana"/>
+            </Menu>
+            <Menu text="Ayuda">
+                <MenuItem text="Acerca de" onAction="#mostrarAcercaDe"/>
+            </Menu>
+        </menus>
+    </MenuBar>
+
+    <!-- Formulario de entrada -->
+    <GridPane hgap="12" vgap="10">
+        <columnConstraints>
+            <ColumnConstraints minWidth="100" />
+            <ColumnConstraints minWidth="200" />
+        </columnConstraints>
+
+        <rowConstraints>
+            <RowConstraints minHeight="30"/>
+            <RowConstraints minHeight="30"/>
+            <RowConstraints minHeight="30"/>
+        </rowConstraints>
+
+        <children>
+            <Label text="Nombre" />
+            <TextField fx:id="txtNombre" GridPane.columnIndex="1" promptText="Ingrese nombre" />
+
+            <Label text="Apellido" GridPane.rowIndex="1" />
+            <TextField fx:id="txtApellido" GridPane.columnIndex="1" GridPane.rowIndex="1" promptText="Ingrese apellido" />
+
+            <Label text="Fecha de Nacimiento" GridPane.rowIndex="2" />
+            <DatePicker fx:id="datePickerFechaNacimiento" GridPane.columnIndex="1" GridPane.rowIndex="2" />
+        </children>
+    </GridPane>
+
+    <!-- Botones -->
+    <HBox spacing="10">
+        <children>
+            <Button fx:id="btnAdd" text="Agregar"/>
+            <Button fx:id="btnDelete" text="Eliminar"/>
+            <Button fx:id="btnRestore" text="Restaurar">
+                <tooltip>
+                    <Tooltip text="Restaura todos los registros originales en la tabla" />
+                </tooltip>
+            </Button>
+        </children>
+    </HBox>
+
+    <!-- Tabla -->
+    <TableView fx:id="tableView" prefHeight="280.0">
+        <columns>
+            <TableColumn fx:id="colId" text="ID" prefWidth="75.0"/>
+            <TableColumn fx:id="colNombre" text="Nombre" prefWidth="150.0"/>
+            <TableColumn fx:id="colApellido" text="Apellido" prefWidth="150.0"/>
+            <TableColumn fx:id="colFechaNacimiento" text="Fecha de Nacimiento" prefWidth="150.0"/>
+        </columns>
+    </TableView>
+
 </VBox>
