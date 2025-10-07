@@ -6,10 +6,29 @@ import javafx.scene.Scene;
 import javafx.scene.control.Alert;
 import javafx.stage.Stage;
 
+import java.io.File;
+
 public class App extends Application {
 
     @Override
     public void start(Stage stage) {
+
+        // ✅ Crear carpeta logs si no existe
+        try {
+            File logDir = new File("logs");
+            if (!logDir.exists()) {
+                boolean created = logDir.mkdirs();
+                if (created) {
+                    System.out.println("Carpeta 'logs' creada correctamente.");
+                } else {
+                    System.out.println("No se pudo crear la carpeta 'logs'.");
+                }
+            }
+        } catch (Exception e) {
+            System.out.println("Error creando carpeta logs: " + e.getMessage());
+        }
+
+        // Cargar interfaz JavaFX
         try {
             FXMLLoader loader = new FXMLLoader(App.class.getResource("FXML/Pers.fxml"));
             Scene scene = new Scene(loader.load(), 600, 400);
