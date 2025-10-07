@@ -5,3 +5,4 @@ public class Lanzador {
         App.main(args);
     }
 }
+
