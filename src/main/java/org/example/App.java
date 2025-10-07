@@ -33,6 +33,8 @@ public class App extends Application {
             FXMLLoader loader = new FXMLLoader(App.class.getResource("FXML/Pers.fxml"));
             Scene scene = new Scene(loader.load(), 600, 400);
             stage.setScene(scene);
+            stage.setMinWidth(700);
+            stage.setMinHeight(400);
             stage.setTitle("Tabla de Personas");
             stage.show();
         } catch (Exception e) {

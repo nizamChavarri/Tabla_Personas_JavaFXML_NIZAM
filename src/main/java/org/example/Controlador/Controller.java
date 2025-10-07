@@ -57,6 +57,8 @@ public class Controller {
 
         // Carga datos desde la DB
         personas = cargarDatosDesdeDB();
+
+        // Backup con la lista original para restaurar
         backupPersonas = FXCollections.observableArrayList(personas);
 
         tableView.setItems(personas);
@@ -131,7 +133,7 @@ public class Controller {
                     int id = generatedKeys.getInt(1);
                     Persona nueva = new Persona(id, nombre, apellido, fecha);
                     personas.add(nueva);
-                    backupPersonas.add(nueva);
+                    backupPersonas.add(nueva);  // También agregar al backup para mantenerlo actualizado
                     limpiarCampos();
                     logger.info("Persona agregada: {} {} (ID: {})", nombre, apellido, id);
                 } else {
@@ -162,8 +164,9 @@ public class Controller {
             for (Persona p : seleccionados) {
                 pstmt.setInt(1, p.getId());
                 pstmt.executeUpdate();
+
+                // Solo eliminar de la lista visible, no del backup
                 personas.remove(p);
-                backupPersonas.remove(p);
                 logger.info("Persona eliminada: {} {} (ID: {})", p.getNombre(), p.getApellido(), p.getId());
             }
 
