@@ -13,6 +13,7 @@ import org.slf4j.LoggerFactory;
 import java.sql.*;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import javafx.stage.Stage;
 
 public class Controller {
 
@@ -195,6 +196,21 @@ public class Controller {
         alert.setTitle(titulo);
         alert.setHeaderText(null);
         alert.setContentText(mensaje);
+        alert.showAndWait();
+    }
+
+    @FXML
+    private void cerrarVentana() {
+        Stage stage = (Stage) tableView.getScene().getWindow();
+        stage.close();
+    }
+
+    @FXML
+    private void mostrarAcercaDe() {
+        Alert alert = new Alert(Alert.AlertType.INFORMATION);
+        alert.setTitle("Acerca de");
+        alert.setHeaderText("Información del programa");
+        alert.setContentText("Este programa fue creado por Nizam\nVersión 1.0");
         alert.showAndWait();
     }
 }
