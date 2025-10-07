@@ -8,6 +8,8 @@ import javafx.stage.Stage;
 
 import java.io.File;
 
+import javafx.scene.image.Image;
+
 public class App extends Application {
 
     @Override
@@ -36,6 +38,7 @@ public class App extends Application {
             stage.setMinWidth(700);
             stage.setMinHeight(400);
             stage.setTitle("Tabla de Personas");
+            stage.getIcons().add(new Image(getClass().getResourceAsStream("/icono/icono.jpg")));
             stage.show();
         } catch (Exception e) {
             e.printStackTrace();
