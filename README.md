@@ -1,4 +1,5 @@
 📌 IDENTIFICACIÓN DE LA ACTIVIDAD: Tabla_Personas_JavaFXML_NIZAM
+
 **📖 Descripción**
 
 Aplicación de escritorio en **JavaFX** para gestionar información de personas, con soporte de **base de datos MariaDB** y registro de **logs**.
