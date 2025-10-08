@@ -7,13 +7,15 @@ import javafx.scene.control.*;
 import javafx.beans.property.SimpleIntegerProperty;
 import javafx.beans.property.SimpleStringProperty;
 import org.example.Modelo.Persona;
+import org.example.dao.DaoPersonas;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import javafx.concurrent.Task;
+import javafx.application.Platform;
+import javafx.stage.Stage;
 
-import java.sql.*;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
-import javafx.stage.Stage;
 
 public class Controller {
 
@@ -36,13 +38,7 @@ public class Controller {
 
     private int nextId = 1;
 
-    // Logger SLF4J
     private static final Logger logger = LoggerFactory.getLogger(Controller.class);
-
-    // Configuración conexión (cambia tus datos)
-    private final String URL = "jdbc:mariadb://localhost:3306/Personas_mariadb";
-    private final String USER = "root";
-    private final String PASSWORD = "admin";
 
     @FXML
     private void initialize() {
@@ -56,53 +52,42 @@ public class Controller {
 
         tableView.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
 
-        // Carga datos desde la DB
-        personas = cargarDatosDesdeDB();
-
-        // Backup con la lista original para restaurar
-        backupPersonas = FXCollections.observableArrayList(personas);
-
-        tableView.setItems(personas);
+        // Carga de datos asincrónica
+        cargarDatosAsincrono();
 
         // Eventos botones
-        btnAdd.setOnAction(e -> agregarPersona());
-        btnDelete.setOnAction(e -> eliminarSeleccionados());
+        btnAdd.setOnAction(e -> agregarPersonaAsincrono());
+        btnDelete.setOnAction(e -> eliminarSeleccionadosAsincrono());
         btnRestore.setOnAction(e -> restaurarFilas());
     }
 
-    private ObservableList<Persona> cargarDatosDesdeDB() {
-        ObservableList<Persona> lista = FXCollections.observableArrayList();
-        String sql = "SELECT id, nombre, apellido, fecha_nacimiento FROM personas";
-
-        try (Connection conn = DriverManager.getConnection(URL, USER, PASSWORD);
-             Statement stmt = conn.createStatement();
-             ResultSet rs = stmt.executeQuery(sql)) {
-
-            while (rs.next()) {
-                int id = rs.getInt("id");
-                String nombre = rs.getString("nombre");
-                String apellido = rs.getString("apellido");
-                Date fecha = rs.getDate("fecha_nacimiento");
-                LocalDate fechaNacimiento = fecha != null ? fecha.toLocalDate() : null;
-
-                Persona p = new Persona(id, nombre, apellido, fechaNacimiento);
-                lista.add(p);
+    // =================== CARGA ASINCRONA ===================
+    private void cargarDatosAsincrono() {
+        Task<ObservableList<Persona>> task = new Task<>() {
+            @Override
+            protected ObservableList<Persona> call() throws Exception {
+                return DaoPersonas.cargarPersonas();
             }
+        };
 
-            logger.info("Datos cargados correctamente desde la base de datos. Total registros: {}", lista.size());
+        task.setOnSucceeded(e -> {
+            personas = task.getValue();
+            backupPersonas = FXCollections.observableArrayList(personas);
+            tableView.setItems(personas);
+            nextId = personas.stream().mapToInt(Persona::getId).max().orElse(0) + 1;
+            logger.info("Datos cargados correctamente. Total registros: {}", personas.size());
+        });
 
-        } catch (SQLException e) {
-            logger.error("Error cargando datos desde la base de datos", e);
-            mostrarAlerta("Error", "No se pudo cargar datos desde la base de datos:\n" + e.getMessage());
-        }
+        task.setOnFailed(e -> {
+            mostrarAlerta("Error", "No se pudo cargar datos:\n" + task.getException().getMessage());
+            logger.error("Error cargando datos", task.getException());
+        });
 
-        // Ajusta nextId para nuevos registros
-        nextId = lista.stream().mapToInt(Persona::getId).max().orElse(0) + 1;
-
-        return lista;
+        new Thread(task).start();
     }
 
-    private void agregarPersona() {
+    // =================== AGREGAR ASINCRONO ===================
+    private void agregarPersonaAsincrono() {
         String nombre = txtNombre.getText().trim();
         String apellido = txtApellido.getText().trim();
         LocalDate fecha = datePickerFechaNacimiento.getValue();
@@ -113,43 +98,39 @@ public class Controller {
             return;
         }
 
-        String sqlInsert = "INSERT INTO personas (nombre, apellido, fecha_nacimiento) VALUES (?, ?, ?)";
+        Persona nueva = new Persona(0, nombre, apellido, fecha);
 
-        try (Connection conn = DriverManager.getConnection(URL, USER, PASSWORD);
-             PreparedStatement pstmt = conn.prepareStatement(sqlInsert, Statement.RETURN_GENERATED_KEYS)) {
+        Task<Integer> task = new Task<>() {
+            @Override
+            protected Integer call() throws Exception {
+                return DaoPersonas.insertarPersona(nueva);
+            }
+        };
 
-            pstmt.setString(1, nombre);
-            pstmt.setString(2, apellido);
-            pstmt.setDate(3, Date.valueOf(fecha));
-            int affectedRows = pstmt.executeUpdate();
-
-            if (affectedRows == 0) {
-                mostrarAlerta("Error", "No se pudo insertar la persona en la base de datos");
+        task.setOnSucceeded(e -> {
+            int idGenerado = task.getValue();
+            if (idGenerado > 0) {
+                Persona p = new Persona(idGenerado, nombre, apellido, fecha);
+                personas.add(p);
+                backupPersonas.add(p);
+                limpiarCampos();
+                logger.info("Persona agregada: {} {} (ID: {})", nombre, apellido, idGenerado);
+            } else {
+                mostrarAlerta("Error", "No se pudo agregar la persona");
                 logger.error("No se insertó la persona: {} {}", nombre, apellido);
-                return;
             }
+        });
 
-            try (ResultSet generatedKeys = pstmt.getGeneratedKeys()) {
-                if (generatedKeys.next()) {
-                    int id = generatedKeys.getInt(1);
-                    Persona nueva = new Persona(id, nombre, apellido, fecha);
-                    personas.add(nueva);
-                    backupPersonas.add(nueva);  // También agregar al backup para mantenerlo actualizado
-                    limpiarCampos();
-                    logger.info("Persona agregada: {} {} (ID: {})", nombre, apellido, id);
-                } else {
-                    mostrarAlerta("Error", "No se pudo obtener el ID generado");
-                    logger.error("No se pudo obtener el ID generado para la persona: {} {}", nombre, apellido);
-                }
-            }
+        task.setOnFailed(e -> {
+            mostrarAlerta("Error", "Error al insertar en la DB:\n" + task.getException().getMessage());
+            logger.error("Error insertando persona", task.getException());
+        });
 
-        } catch (SQLException e) {
-            mostrarAlerta("Error", "Error al insertar en la base de datos:\n" + e.getMessage());
-            logger.error("Error al insertar persona en la base de datos", e);
-        }
+        new Thread(task).start();
     }
 
-    private void eliminarSeleccionados() {
+    // =================== ELIMINAR ASINCRONO ===================
+    private void eliminarSeleccionadosAsincrono() {
         ObservableList<Persona> seleccionados = tableView.getSelectionModel().getSelectedItems();
         if (seleccionados.isEmpty()) {
             mostrarAlerta("Atención", "No hay filas seleccionadas para eliminar");
@@ -157,26 +138,30 @@ public class Controller {
             return;
         }
 
-        String sqlDelete = "DELETE FROM personas WHERE id = ?";
-
-        try (Connection conn = DriverManager.getConnection(URL, USER, PASSWORD);
-             PreparedStatement pstmt = conn.prepareStatement(sqlDelete)) {
-
-            for (Persona p : seleccionados) {
-                pstmt.setInt(1, p.getId());
-                pstmt.executeUpdate();
-
-                // Solo eliminar de la lista visible, no del backup
-                personas.remove(p);
-                logger.info("Persona eliminada: {} {} (ID: {})", p.getNombre(), p.getApellido(), p.getId());
+        Task<Void> task = new Task<>() {
+            @Override
+            protected Void call() throws Exception {
+                for (Persona p : seleccionados) {
+                    DaoPersonas.eliminarPersona(p.getId());
+                }
+                return null;
             }
+        };
 
-        } catch (SQLException e) {
-            mostrarAlerta("Error", "Error al eliminar en la base de datos:\n" + e.getMessage());
-            logger.error("Error al eliminar personas en la base de datos", e);
-        }
+        task.setOnSucceeded(e -> {
+            personas.removeAll(seleccionados);
+            logger.info("Registros eliminados: {}", seleccionados.size());
+        });
+
+        task.setOnFailed(e -> {
+            mostrarAlerta("Error", "Error al eliminar registros:\n" + task.getException().getMessage());
+            logger.error("Error eliminando registros", task.getException());
+        });
+
+        new Thread(task).start();
     }
 
+    // =================== RESTAURAR ===================
     private void restaurarFilas() {
         if (backupPersonas != null) {
             personas.setAll(backupPersonas);
@@ -192,11 +177,13 @@ public class Controller {
     }
 
     private void mostrarAlerta(String titulo, String mensaje) {
-        Alert alert = new Alert(Alert.AlertType.INFORMATION);
-        alert.setTitle(titulo);
-        alert.setHeaderText(null);
-        alert.setContentText(mensaje);
-        alert.showAndWait();
+        Platform.runLater(() -> {
+            Alert alert = new Alert(Alert.AlertType.INFORMATION);
+            alert.setTitle(titulo);
+            alert.setHeaderText(null);
+            alert.setContentText(mensaje);
+            alert.showAndWait();
+        });
     }
 
     @FXML
